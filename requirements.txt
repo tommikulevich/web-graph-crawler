@@ -1,1 +1,9 @@
-# TODO
+PyYAML
+aiohttp
+beautifulsoup4
+networkx
+powerlaw
+pandas
+seaborn
+matplotlib
+pyvis
