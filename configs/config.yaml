@@ -1,0 +1,15 @@
+crawler:
+  base_url: "http://example.com/"
+  max_pages: 4000
+  threads_num: 16
+  timeout_s: 3
+  user_agent: "MSCrawler/1.0"
+  storage_path: "data/storage"
+
+analysis:
+  reports_path: "data/reports"
+
+pagerank:
+  damping_factor: 0.85
+  max_iterations: 100
+  tol: 1e-6
