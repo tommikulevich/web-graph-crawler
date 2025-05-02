@@ -14,7 +14,8 @@ def init_file_logger(log_file: str) -> None:
     os.makedirs(os.path.dirname(log_file), exist_ok=True)
     
     fh = logging.FileHandler(log_file)
-    formatter = logging.Formatter('[%(asctime)s] [%(name)s | %(levelname)s] %(message)s')
+    formatter = logging.Formatter(
+        '[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s')
     fh.setFormatter(formatter)
     root = logging.getLogger()
     root.setLevel(logging.INFO)
@@ -29,7 +30,7 @@ def get_logger(name: str) -> logging.Logger:
     if not logger.handlers:
         handler = logging.StreamHandler()
         formatter = logging.Formatter(
-            '[%(asctime)s] [%(name)s | %(levelname)s] %(message)s')
+            '[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)

@@ -1,4 +1,4 @@
-from aiohttp import ClientTimeout, ClientSession
+import requests
 from urllib.robotparser import RobotFileParser
 from urllib.parse import urljoin
 from typing import Optional
@@ -11,46 +11,44 @@ class Fetcher:
         
         self.robots_parser: RobotFileParser = RobotFileParser()
         
-        self.session: Optional[ClientSession] = None
+        self.session: Optional[requests.Session] = None
         self.base_url: Optional[str] = None
 
-    async def start(self, base_url: str) -> None:
-        """Initialize aiohttp session with timeout and fetch robots.txt for the base URL."""
+    def start(self, base_url: str) -> None:
+        """Initialize requests session and fetch robots.txt for the base URL."""
         
-        client_timeout = ClientTimeout(total=self.timeout_s)
-        self.session = ClientSession(
-            headers={'User-Agent': self.user_agent},
-            timeout=client_timeout
-        )
-        
+        self.session = requests.Session()
+        self.session.headers.update({'User-Agent': self.user_agent})
         self.base_url = base_url.rstrip('/')
         robots_url = urljoin(self.base_url, '/robots.txt')
+        
         try:
-            async with self.session.get(robots_url) as resp:
-                if resp.status == 200:
-                    text = await resp.text()
-                else:
-                    text = ''
+            resp = self.session.get(robots_url, timeout=self.timeout_s)
+            if resp.status_code == 200:
+                text = resp.text
+            else:
+                text = ''
         except Exception:
             text = ''
             
         self.robots_parser.parse(text.splitlines())
 
-    async def fetch(self, url: str) -> bytes:
-        """Fetch content from URL asynchronously."""
+    def fetch(self, url: str) -> bytes:
+        """Fetch content from URL synchronously."""
         
         if not self.session:
-            await self.start()
-            
-        async with self.session.get(url) as response:
-            response.raise_for_status()
-            return await response.read()
+            raise RuntimeError('Session not initialized; call start() first')
+        
+        resp = self.session.get(url, timeout=self.timeout_s)
+        resp.raise_for_status()
+        
+        return resp.content
 
-    async def close(self) -> None:
-        """Close aiohttp session."""
+    def close(self) -> None:
+        """Close requests session."""
         
         if self.session:
-            await self.session.close()
+            self.session.close()
             
     def is_allowed(self, url: str) -> bool:
         """Check if fetching the URL is allowed by the parsed robots.txt."""

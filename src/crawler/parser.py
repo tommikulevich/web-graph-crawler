@@ -1,4 +1,4 @@
-from bs4 import BeautifulSoup
+from lxml import html
 from urllib.parse import urljoin
 from typing import List
 
@@ -7,14 +7,19 @@ class Parser:
     def __init__(self) -> None:
         pass
 
-    def extract_links(self, html: bytes, base_url: str) -> List[str]:
-        """Parse HTML bytes and return list of absolute URLs."""
+    def extract_links(self, html_content: bytes, base_url: str) -> List[str]:
+        """Parse HTML bytes with lxml and return list of absolute URLs."""
         
-        soup = BeautifulSoup(html, 'html.parser')
+        try:
+            doc = html.fromstring(html_content)
+        except Exception:
+            return []
         
-        links = []
-        for tag in soup.find_all('a', href=True):
-            href = tag['href']
+        links: List[str] = []
+        for element in doc.xpath('//a[@href]'):
+            href = element.get('href')
+            if not href:
+                continue
             url = urljoin(base_url, href)
             links.append(url)
             
