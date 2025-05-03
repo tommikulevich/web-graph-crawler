@@ -1,9 +1,10 @@
-PyYAML
-aiohttp
-beautifulsoup4
-networkx
-powerlaw
+pyyaml
+requests
+lxml
 pandas
+pyvis
+powerlaw
+numpy
 seaborn
 matplotlib
-pyvis
+networkx
