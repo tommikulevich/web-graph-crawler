@@ -38,9 +38,11 @@ def plot_degree_distribution(in_degrees: List[int], out_degrees: List[int], img_
         pmf = counts / counts.sum()
 
         mask = ks >= fit.xmin
+        pmf_masked = counts[mask] / counts[mask].sum()
+
         ax.scatter(ks[~mask], pmf[~mask],
                    color='gray', alpha=0.6, label='k < xmin')
-        ax.scatter(ks[mask], pmf[mask],
+        ax.scatter(ks[mask], pmf_masked,
                    color='C0', marker='o', label='k ≥ xmin')
 
         x = np.arange(int(fit.xmin), max_k+1)
@@ -249,8 +251,11 @@ def plot_pagerank_histogram_and_powerlaw(ranks: Dict[Any, float], damping: float
     plt.loglog(centers, hist, marker="o", linestyle="none", label="empirical")
 
     x_fit = np.logspace(np.log10(xmin), np.log10(vals.max()), 200)
-    C = (alpha - 1) / xmin 
+    
+    frac = np.sum(vals >= xmin) / vals.size
+    C = (alpha - 1) / xmin
     y_fit = C * (x_fit / xmin) ** (-alpha)
+    y_fit *= frac
     plt.loglog(x_fit, y_fit, "r--", label=f"fit (alpha={alpha:.2f})")
 
     plt.axvline(xmin, color="gray", linestyle=":", label=f"xmin = {xmin}")
