@@ -27,12 +27,12 @@ def run_robustness_experiment(cfg: Config,
         for row in reader:
             edges.append((row['source'], row['target']))
             
-    G = ga.build_graph(edges)
+    G = ga.build_directed_graph(edges)
     
     # [MS] 2.3.6
     
     if removal_fractions is None:
-        removal_fractions = [0.01, 0.05, 0.1, 0.2, 0.3, 0.5, 0.7]
+        removal_fractions = [0.01, 0.03, 0.05, 0.1, 0.3, 0.5]
 
     records = []
     for frac in removal_fractions:

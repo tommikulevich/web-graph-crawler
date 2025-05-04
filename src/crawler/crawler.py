@@ -11,7 +11,7 @@ from .parser import Parser
 from .storage import Storage
 
 
-class Scheduler:
+class Crawler:
     def __init__(self, base_url: str, max_pages: int, threads_num: int,
                  user_agent: str, storage_path: str, timeout_s: float) -> None:
         self.base_url = base_url.rstrip('/')
@@ -32,7 +32,8 @@ class Scheduler:
         self._visited_file = os.path.join(self.storage_path, 'visited.txt')
         self._edges_file = os.path.join(self.storage_path, 'edges.partial.csv')
 
-        self.lock = threading.RLock()
+        self.visited_lock = threading.RLock()
+        self.edges_lock = threading.RLock()
         self._stop_flush = threading.Event()
 
     def start(self) -> None:
@@ -48,7 +49,7 @@ class Scheduler:
         for _, tgt in self.edges:
             if tgt not in self.visited:
                 initial.add(tgt)
-        with self.lock:
+        with self.visited_lock:
             self.seen.update(initial)
         for url in initial:
             task_queue.put(url)
@@ -76,15 +77,21 @@ class Scheduler:
 
         self._stop_flush.set()
         flush_thread.join()
-        with self.lock:
+        with self.visited_lock:
             try:
                 self._visited_fh.flush()
+            except Exception:
+                pass
+            try:
+                self._visited_fh.close()
+            except Exception:
+                pass
+        with self.edges_lock:
+            try:
                 self._edges_fh.flush()
             except Exception:
                 pass
-            
             try:
-                self._visited_fh.close()
                 self._edges_fh.close()
             except Exception:
                 pass
@@ -133,7 +140,7 @@ class Scheduler:
     def _record_visited(self, url: str) -> None:
         """Record visited URL to buffer and memory."""
         
-        with self.lock:
+        with self.visited_lock:
             if url not in self.visited:
                 self.visited.add(url)
                 self._visited_fh.write(url + '\n')
@@ -141,7 +148,7 @@ class Scheduler:
     def _record_edge(self, src: str, tgt: str) -> None:
         """Record directed edge to buffer and memory."""
         
-        with self.lock:
+        with self.edges_lock:
             pair = (src, tgt)
             if pair not in self.edges:
                 self._edges_writer.writerow([src, tgt])
@@ -151,46 +158,50 @@ class Scheduler:
         """Periodically flush open file buffers to disk."""
         
         while not self._stop_flush.is_set():
-            with self.lock:
+            with self.visited_lock:
                 try:
                     self._visited_fh.flush()
+                except Exception:
+                    pass
+
+            with self.edges_lock:
+                try:
                     self._edges_fh.flush()
                 except Exception:
                     pass
-                
             time.sleep(5)
 
 
 class Worker:
-    def __init__(self, scheduler: Scheduler, worker_id: int) -> None:
-        self.scheduler = scheduler
+    def __init__(self, crawler: Crawler, worker_id: int) -> None:
+        self.crawler = crawler
         self.worker_id = worker_id
         
-        self.fetcher = Fetcher(scheduler.user_agent, scheduler.timeout_s)
+        self.fetcher = Fetcher(crawler.user_agent, crawler.timeout_s)
         self.parser = Parser()
 
     def run(self, task_queue: queue.Queue) -> None:
-        logger = self.scheduler.logger
+        logger = self.crawler.logger
 
         try:
-            self.fetcher.start(self.scheduler.base_url)
+            self.fetcher.start(self.crawler.base_url)
         except Exception as e:
             logger.error(f'[{self.worker_id}] Fetcher init error: {e}')
             return
 
         while True:
-            with self.scheduler.lock:
-                if len(self.scheduler.visited) >= self.scheduler.max_pages:
+            with self.crawler.visited_lock:
+                if len(self.crawler.visited) >= self.crawler.max_pages:
                     break
             try:
                 url = task_queue.get(timeout=5)
             except queue.Empty:
                 break
 
-            if not url.startswith(self.scheduler.base_url):
-                continue
-            if url in self.scheduler.visited:
-                continue
+            with self.crawler.visited_lock:
+                if url in self.crawler.visited:
+                    continue
+
             if not self.fetcher.is_allowed(url):
                 logger.info(f'[{self.worker_id}] Blocked by robots.txt: {url}')
                 continue
@@ -201,10 +212,10 @@ class Worker:
                 logger.error(f'[{self.worker_id}] Fetch error {url}: {e}')
                 continue
 
-            self.scheduler._record_visited(url)
+            self.crawler._record_visited(url)
 
             try:
-                path = self.scheduler.storage.save(url, content)
+                path = self.crawler.storage.save(url, content)
                 logger.info(f'[{self.worker_id}] Fetched {url} -> {path}')
             except Exception as e:
                 logger.error(f'[{self.worker_id}] Save error {url}: {e}')
@@ -217,13 +228,12 @@ class Worker:
                 continue
 
             for link in links:
-                if not link.startswith(self.scheduler.base_url):
-                    continue
-                self.scheduler._record_edge(url, link)
-                if link not in self.scheduler.seen:
-                    with self.scheduler.lock:
-                        self.scheduler.seen.add(link)
-                    task_queue.put(link)
+                self.crawler._record_edge(url, link)
+
+                with self.crawler.visited_lock:
+                    if link not in self.crawler.seen:
+                        self.crawler.seen.add(link)
+                        task_queue.put(link)
 
         try:
             self.fetcher.close()

@@ -6,7 +6,7 @@ from typing import List, Optional
 
 from common.logger import get_logger, init_file_logger
 from common.config import load_config, Config
-from crawler.scheduler import Scheduler
+from crawler.crawler import Crawler
 import experiments.plotting_helper as ph
 
 
@@ -39,11 +39,9 @@ def run_performance_experiment(cfg: Config, thread_list: Optional[List[int]] = N
             str(t),
             os.path.basename(orig_storage)
         )
-        
-        logger.info(f"Performance test: threads={t}, storage={cfg.crawler.storage_path}")
-        
+                
         start = time.perf_counter()
-        sched = Scheduler(
+        sched = Crawler(
             base_url=cfg.crawler.base_url,
             max_pages=cfg.crawler.max_pages,
             threads_num=cfg.crawler.threads_num,
@@ -54,6 +52,7 @@ def run_performance_experiment(cfg: Config, thread_list: Optional[List[int]] = N
         sched.start()
         
         elapsed = time.perf_counter() - start
+        logger.info(f"Performance test: threads={t}, elapsed={elapsed:.2f} seconds")
         results.append({'threads': t, 'elapsed': elapsed})
         
     df = pd.DataFrame(results)

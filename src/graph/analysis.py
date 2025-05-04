@@ -6,7 +6,7 @@ from typing import Any, Optional, Set, List, Tuple, Dict
 
 # Helpers
 
-def build_graph(edges: List[Tuple[str, str]]) -> nx.DiGraph:
+def build_directed_graph(edges: List[Tuple[str, str]]) -> nx.DiGraph:
     """Construct a directed graph from a list of (source, target) edges."""
     
     G = nx.DiGraph()
@@ -15,14 +15,14 @@ def build_graph(edges: List[Tuple[str, str]]) -> nx.DiGraph:
     return G
 
 def _prepare_undirected_subgraph(G: nx.DiGraph) -> nx.Graph:
-    """Return undirected subgraph of the largest connected component."""
+    """Return undirected subgraph of the largest strongly connected component."""
     
-    U = G.to_undirected()
-    if not nx.is_connected(U):
-        largest_cc = max(nx.connected_components(U), key=len)
-        U = U.subgraph(largest_cc).copy()
-        
-    return U
+    sccs = list(nx.strongly_connected_components(G))
+    if not sccs:
+        return G.subgraph([])
+    largest = max(sccs, key=len)
+    
+    return G.subgraph(largest).copy()
 
 # [MS] 2.3.1
    
@@ -107,7 +107,7 @@ def fit_out_degree_powerlaw(G: nx.DiGraph) -> Optional[Dict[str, float]]:
 # [MS] 2.3.4
 
 def get_average_distance(G: nx.DiGraph) -> Optional[float]:
-    """Return average shortest path length (largest CC)."""
+    """Return average shortest path length (largest SCC)."""
     
     U = _prepare_undirected_subgraph(G)
     try:
@@ -116,7 +116,7 @@ def get_average_distance(G: nx.DiGraph) -> Optional[float]:
         return None
 
 def get_diameter(G: nx.DiGraph) -> Optional[int]:
-    """Return diameter (largest CC)."""
+    """Return diameter (largest SCC)."""
     
     U = _prepare_undirected_subgraph(G)
     try:
@@ -125,7 +125,7 @@ def get_diameter(G: nx.DiGraph) -> Optional[int]:
         return None
 
 def get_eccentricity(G: nx.DiGraph) -> Dict[Any, int]:
-    """Return eccentricity per node (largest CC)."""
+    """Return eccentricity per node (largest SCC)."""
     
     U = _prepare_undirected_subgraph(G)
     try:
@@ -133,8 +133,14 @@ def get_eccentricity(G: nx.DiGraph) -> Dict[Any, int]:
     except Exception:
         return {}
 
+def get_radius(G: nx.DiGraph) -> int:
+    """Radius = min of eccentricity."""
+    
+    ecc = get_eccentricity(G)
+    return min(ecc.values()) if ecc else None
+
 def get_distance_histogram(G: nx.DiGraph) -> Dict[int, int]:
-    """Return histogram of shortest path lengths (largest CC)."""
+    """Return histogram of shortest path lengths (largest SCC)."""
     
     U = _prepare_undirected_subgraph(G)
     lengths = []
@@ -143,7 +149,7 @@ def get_distance_histogram(G: nx.DiGraph) -> Dict[int, int]:
     return dict(Counter(lengths))
     
 def get_average_distance_per_node(G: nx.DiGraph) -> Dict[Any, float]:
-    """Return average shortest path length per node (largest CC)."""
+    """Return average shortest path length per node (largest SCC)."""
     
     U = _prepare_undirected_subgraph(G)
     avg_dist = {}
@@ -162,17 +168,17 @@ def get_local_clustering(G: nx.DiGraph) -> Dict[Any, float]:
     UG = G.to_undirected()
     return nx.clustering(UG)
 
-def get_global_clustering(G: nx.DiGraph) -> float:
-    """Return global clustering coefficient (transitivity)."""
-    
-    UG = G.to_undirected()
-    return nx.transitivity(UG)
-
 def get_local_clustering_histogram(G: nx.DiGraph) -> Dict[float, int]:
     """Return histogram of local clustering values."""
     
     local = get_local_clustering(G)
     return dict(Counter(local.values()))
+
+def get_global_clustering(G: nx.DiGraph) -> float:
+    """Return global clustering coefficient (transitivity)."""
+    
+    UG = G.to_undirected()
+    return nx.transitivity(UG)
 
 # [MS] 2.3.7
 

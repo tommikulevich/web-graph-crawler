@@ -1,10 +1,10 @@
 import networkx as nx
-from typing import Dict
+from typing import Any, Dict, List, Tuple
 
 # [MS] 2.4
 
 def pagerank(G: nx.DiGraph, damping_factor: float, max_iterations: int,
-             tol: float) -> Dict[str, float]:
+             tol: float) -> Tuple[Dict[Any, float], List[float]]:
     """Compute PageRank for each node."""
     
     N = G.number_of_nodes()
@@ -20,6 +20,8 @@ def pagerank(G: nx.DiGraph, damping_factor: float, max_iterations: int,
     
     # Dangling nodes
     dangling = [n for n in nodes if G.out_degree(n) == 0]
+    
+    diffs = []
     for _ in range(max_iterations):
         new_rank = {}
         
@@ -38,8 +40,9 @@ def pagerank(G: nx.DiGraph, damping_factor: float, max_iterations: int,
             
         # Check convergence
         diff = sum(abs(new_rank[n] - rank[n]) for n in nodes)
+        diffs.append(diff)
         rank = new_rank
         if diff < tol:
             break
         
-    return rank
+    return rank, diffs

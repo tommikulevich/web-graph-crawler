@@ -5,7 +5,7 @@ from typing import Dict
 
 from common.config import load_config
 from common.logger import get_logger, init_file_logger
-from crawler.scheduler import Scheduler
+from crawler.crawler import Crawler
 from experiments.analysis_exp import run_analysis_experiment
 from experiments.performance_exp import run_performance_experiment
 from experiments.robustness_exp import run_robustness_experiment
@@ -35,7 +35,7 @@ def cmd_crawl(args):
     logger = get_logger(__name__)
     
     logger.info(f"Run crawler")
-    scheduler = Scheduler(
+    crawler = Crawler(
         base_url=cfg.crawler.base_url,
         max_pages=cfg.crawler.max_pages,
         threads_num=cfg.crawler.threads_num,
@@ -43,15 +43,13 @@ def cmd_crawl(args):
         storage_path=cfg.crawler.storage_path,
         timeout_s=cfg.crawler.timeout_s,
     )
-    scheduler.start()
+    crawler.start()
 
 def cmd_analyze(args):
     """Run full analysis."""
     
     cfg = load_config(args.config)
     report_dir = cfg.analysis.reports_path
-    log_file = os.path.join(report_dir, 'logger.log')
-    init_file_logger(log_file)
 
     base_dir = report_dir
     dirs = _create_dirs(base_dir)

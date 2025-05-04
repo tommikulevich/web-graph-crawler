@@ -1,5 +1,6 @@
 import os
 import json
+import threading
 from hashlib import md5
 
 
@@ -23,6 +24,8 @@ class Storage:
             with open(self.mapping_path, 'w', encoding='utf-8') as f:
                 json.dump(self.mapping, f, indent=2)
 
+        self._lock = threading.RLock()
+
     def save(self, url: str, content: bytes) -> str:
         """Save content to disk under a path derived from the URL (hash). Return file path."""
         
@@ -32,11 +35,12 @@ class Storage:
         with open(file_path, 'wb') as f:
             f.write(content)
 
-        self.mapping[url_hash] = url
-        try:
-            with open(self.mapping_path, 'w', encoding='utf-8') as f:
-                json.dump(self.mapping, f, indent=2)
-        except Exception:
-            pass
+        with self._lock:
+            self.mapping[url_hash] = url
+            try:
+                with open(self.mapping_path, 'w', encoding='utf-8') as f2:
+                    json.dump(self.mapping, f2, indent=2)
+            except Exception:
+                pass
         
         return file_path

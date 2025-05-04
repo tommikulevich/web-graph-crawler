@@ -26,7 +26,7 @@ def run_analysis_experiment(cfg: Config, G=None, report_subdir: str = None) -> d
         os.makedirs(data_dir, exist_ok=True)
         edges_df.to_csv(os.path.join(data_dir, 'edges.csv'), index=False)
         edges = list(edges_df.itertuples(index=False, name=None))
-        G = ga.build_graph(edges)
+        G = ga.build_directed_graph(edges)
     else:
         os.makedirs(data_dir, exist_ok=True)
         edges = list(G.edges())
@@ -36,8 +36,7 @@ def run_analysis_experiment(cfg: Config, G=None, report_subdir: str = None) -> d
         
     # [MS] 2.3.1-2.3.5, 2.3.7
 
-    num_nodes = ga.get_number_of_nodes(G)
-    num_edges = ga.get_number_of_edges(G)
+    num_nodes, num_edges = ga.get_number_of_nodes(G), ga.get_number_of_edges(G)
     logger.info(f"Graph: {num_nodes} nodes, {num_edges} edges.")
 
     try:
@@ -50,34 +49,33 @@ def run_analysis_experiment(cfg: Config, G=None, report_subdir: str = None) -> d
     except Exception as e:
         logger.warning(f"Failed to generate interactive graph: {e}")
 
-    logger.info("Computing component structure...")
     wccs = ga.get_weakly_connected_components(G)
+    logger.info(f"Number of weakly connected components: {len(wccs)}")
+    logger.info(f"Number of nodes in largest weakly connected component: {len(max(wccs, key=len))}")
+    logger.info(f"Number of edges in largest weakly connected component: {len(G.subgraph(max(wccs, key=len)).edges())}")
+    
     sccs = ga.get_strongly_connected_components(G)
+    sorted_sccs = sorted(sccs, key=len, reverse=True)
+    largest_scc = sorted_sccs[0] if sorted_sccs else set()
+    second_largest_scc = sorted_sccs[1] if len(sorted_sccs) > 1 else set()
+    third_largest_scc = sorted_sccs[2] if len(sorted_sccs) > 2 else set()
+    logger.info(f"Number of strongly connected components: {len(sccs)}")
+    logger.info(f"Number of nodes in largest SCC: {len(largest_scc)}")
+    logger.info(f"Number of edges in largest SCC: {len(G.subgraph(largest_scc).edges())}")
+    logger.info(f"Number of nodes in 2nd largest SCC: {len(second_largest_scc)}")
+    logger.info(f"Number of edges in 2nd largest SCC: {len(G.subgraph(second_largest_scc).edges())}")
+    logger.info(f"Number of nodes in 3rd largest SCC: {len(third_largest_scc)}")
+    logger.info(f"Number of edges in 3rd largest SCC: {len(G.subgraph(third_largest_scc).edges())}")
     core = ga.get_largest_scc(G)
+    
     in_comp = ga.get_in_component(G)
+    logger.info(f"Number of nodes in in-component: {len(in_comp)}")
+    logger.info(f"Number of edges in in-component: {len(G.subgraph(in_comp).edges())}")
+
     out_comp = ga.get_out_component(G)
-
-    logger.info("Computing degree distributions...")
-    in_degs = ga.get_in_degrees(G)
-    out_degs = ga.get_out_degrees(G)
-    in_fit = ga.fit_in_degree_powerlaw(G)
-    out_fit = ga.fit_out_degree_powerlaw(G)
-
-    logger.info("Computing distance metrics...")
-    avg_dist = ga.get_average_distance(G)
-    diam = ga.get_diameter(G)
-    ecc = ga.get_eccentricity(G)
-    dist_hist = ga.get_distance_histogram(G)
-
-    logger.info("Computing clustering metrics...")
-    glob_clust = ga.get_global_clustering(G)
-    local_hist = ga.get_local_clustering_histogram(G)
-
-    logger.info("Computing connectivity metrics...")
-    art_points = ga.get_articulation_points(G)
-    node_con = ga.get_node_connectivity(G)
-    art_pairs = ga.get_articulation_pairs(G)
-
+    logger.info(f"Number of nodes in out-component: {len(out_comp)}")
+    logger.info(f"Number of edges in out-component: {len(G.subgraph(out_comp).edges())}")
+    
     comp_records = []
     comp_sizes = {
         'wcc': [len(c) for c in wccs],
@@ -91,16 +89,67 @@ def run_analysis_experiment(cfg: Config, G=None, report_subdir: str = None) -> d
             comp_records.append({'type': comp_type, 'size': sz})
     pd.DataFrame(comp_records).to_csv(
         os.path.join(data_dir, 'components.csv'), index=False)
+
+    in_degs = ga.get_in_degrees(G)
+    logger.info(f"Average in-degree: {sum(in_degs) / len(in_degs)}")
+    logger.info(f"Max in-degree: {max(in_degs)}")
+
+    out_degs = ga.get_out_degrees(G)
+    logger.info(f"Average out-degree: {sum(out_degs) / len(out_degs)}")
+    logger.info(f"Max out-degree: {max(out_degs)}")
+
+    in_fit = ga.fit_in_degree_powerlaw(G)
+    logger.info(f"In-degree power-law fit: {in_fit}")
+    
+    out_fit = ga.fit_out_degree_powerlaw(G)
+    logger.info(f"Out-degree power-law fit: {out_fit}")
+    
     pd.DataFrame({'in_degree': in_degs}).to_csv(
         os.path.join(data_dir, 'in_degrees.csv'), index=False)
     pd.DataFrame({'out_degree': out_degs}).to_csv(
         os.path.join(data_dir, 'out_degrees.csv'), index=False)
+    ph.plot_degree_distribution(in_degs, out_degs, img_dir)
+
+    avg_dist = ga.get_average_distance(G)
+    logger.info(f"Average distance: {avg_dist}")
+    
+    diam = ga.get_diameter(G)
+    logger.info(f"Diameter: {diam}")
+    
+    radius = ga.get_radius(G)
+    logger.info(f"Radius: {radius}")
+    
+    ecc = ga.get_eccentricity(G)
+    dist_hist = ga.get_distance_histogram(G)
+    
     pd.DataFrame(list(dist_hist.items()), columns=['distance', 'count']).to_csv(
         os.path.join(data_dir, 'distance_histogram.csv'), index=False)
+    ph.plot_distance_histogram(dist_hist, img_dir)
+
+    glob_clust = ga.get_global_clustering(G)
+    local_hist = ga.get_local_clustering_histogram(G)
+    logger.info(f"Global clustering coefficient: {glob_clust}")
+    
     pd.DataFrame({'clustering': list(local_hist.keys()),
                   'count': list(local_hist.values())}).to_csv(
                             os.path.join(data_dir, 'clustering_histogram.csv'), 
                                         index=False)
+    ph.plot_clustering_histogram(local_hist, img_dir)
+
+    art_points = ga.get_articulation_points(G)
+    logger.info(f"Articulation points: {art_points}")
+    node_con = ga.get_node_connectivity(G)
+    logger.info(f"Node connectivity: {node_con}")
+    art_pairs = ga.get_articulation_pairs(G)
+    logger.info(f"Articulation pairs: {art_pairs}")
+
+    pd.DataFrame(list(ecc.items()), columns=['node', 'eccentricity']).to_csv(
+        os.path.join(data_dir, 'eccentricity.csv'), index=False)
+    pd.DataFrame(art_pairs, columns=['node1', 'node2']).to_csv(
+        os.path.join(data_dir, 'articulation_pairs.csv'), index=False)
+    pd.DataFrame({'articulation_point': art_points}).to_csv(
+        os.path.join(data_dir, 'articulation_points.csv'), index=False)
+    
     summary = {
         'nodes': num_nodes,
         'edges': num_edges,
@@ -120,24 +169,9 @@ def run_analysis_experiment(cfg: Config, G=None, report_subdir: str = None) -> d
         'alpha_out': out_fit['alpha'] if out_fit else None,
         'xmin_out': out_fit['xmin'] if out_fit else None,
     }
-
+    
     pd.DataFrame(list(summary.items()), columns=['metric', 'value']).to_csv(
         os.path.join(data_dir, 'metrics_summary.csv'), index=False)
-    pd.DataFrame(list(ecc.items()), columns=['node', 'eccentricity']).to_csv(
-        os.path.join(data_dir, 'eccentricity.csv'), index=False)
-    pd.DataFrame(art_pairs, columns=['node1', 'node2']).to_csv(
-        os.path.join(data_dir, 'articulation_pairs.csv'), index=False)
-    pd.DataFrame({'articulation_point': art_points}).to_csv(
-        os.path.join(data_dir, 'articulation_points.csv'), index=False)
-
     logger.info(f"Metrics summary: {summary}")
-
-    logger.info("Generating plots for graph analysis...")
-    ph.plot_component_sizes(comp_records, img_dir)
-    ph.plot_degree_distribution(in_degs, out_degs, img_dir)
-    ph.plot_distance_histogram(dist_hist, img_dir)
-    ph.plot_clustering_histogram(local_hist, img_dir)
-    ph.plot_average_distance_histogram(ga.get_average_distance_per_node(G), img_dir)
-    ph.plot_eccentricity_histogram(ecc, img_dir)
     
     return summary
