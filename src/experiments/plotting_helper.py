@@ -243,7 +243,7 @@ def plot_pagerank_histogram_and_powerlaw(ranks: Dict[Any, float], damping: float
     xmin = fit.xmin
     alpha = fit.power_law.alpha
 
-    bins = np.logspace(np.log10(vals.min()), np.log10(vals.max()), 50)
+    bins = np.logspace(np.log10(vals.min()), np.log10(vals.max()), 1000)
     hist, edges = np.histogram(vals, bins=bins, density=True)
     centers = np.sqrt(edges[:-1] * edges[1:])
 

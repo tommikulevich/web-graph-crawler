@@ -201,6 +201,9 @@ class Worker:
             with self.crawler.visited_lock:
                 if url in self.crawler.visited:
                     continue
+                
+            if not url.startswith(self.crawler.base_url):
+                continue
 
             if not self.fetcher.is_allowed(url):
                 logger.info(f'[{self.worker_id}] Blocked by robots.txt: {url}')
